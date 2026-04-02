@@ -1,0 +1,73 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  build:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build (arm64)
+        run: |
+          mkdir -p build-arm64
+          swiftc \
+            -parse-as-library \
+            -target arm64-apple-macosx13.0 \
+            -framework SwiftUI \
+            -framework AppKit \
+            -framework ServiceManagement \
+            -o build-arm64/BarSwitch \
+            BarSwitch/BarSwitchApp.swift \
+            BarSwitch/MenuBarManager.swift \
+            BarSwitch/LaunchAtLoginManager.swift \
+            BarSwitch/KeyboardShortcutManager.swift \
+            BarSwitch/AboutView.swift
+
+      - name: Build (x86_64)
+        run: |
+          mkdir -p build-x86
+          swiftc \
+            -parse-as-library \
+            -target x86_64-apple-macosx13.0 \
+            -framework SwiftUI \
+            -framework AppKit \
+            -framework ServiceManagement \
+            -o build-x86/BarSwitch \
+            BarSwitch/BarSwitchApp.swift \
+            BarSwitch/MenuBarManager.swift \
+            BarSwitch/LaunchAtLoginManager.swift \
+            BarSwitch/KeyboardShortcutManager.swift \
+            BarSwitch/AboutView.swift
+
+      - name: Create universal binary
+        run: |
+          mkdir -p build/BarSwitch.app/Contents/MacOS
+          mkdir -p build/BarSwitch.app/Contents/Resources
+          lipo -create build-arm64/BarSwitch build-x86/BarSwitch -output build/BarSwitch.app/Contents/MacOS/BarSwitch
+          cp BarSwitch/Info.plist build/BarSwitch.app/Contents/Info.plist
+          cp BarSwitch/AppIcon.icns build/BarSwitch.app/Contents/Resources/AppIcon.icns
+
+      - name: Create DMG
+        run: |
+          brew install create-dmg
+          create-dmg \
+            --volname "BarSwitch" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "BarSwitch.app" 175 200 \
+            --app-drop-link 425 200 \
+            "BarSwitch-${GITHUB_REF_NAME}.dmg" \
+            "build/BarSwitch.app"
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: BarSwitch-*.dmg
+          generate_release_notes: true
