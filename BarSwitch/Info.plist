@@ -24,5 +24,9 @@
     <true/>
     <key>NSHumanReadableCopyright</key>
     <string>Copyright © 2026 BarSwitch. All rights reserved.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>BarSwitch uses Apple Events to toggle the menu bar visibility through System Preferences.</string>
+    <key>NSAccessibilityUsageDescription</key>
+    <string>BarSwitch uses accessibility to listen for the global keyboard shortcut (⌘⇧H).</string>
 </dict>
 </plist>

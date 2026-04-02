@@ -26,8 +26,7 @@ jobs:
             BarSwitch/BarSwitchApp.swift \
             BarSwitch/MenuBarManager.swift \
             BarSwitch/LaunchAtLoginManager.swift \
-            BarSwitch/KeyboardShortcutManager.swift \
-            BarSwitch/AboutView.swift
+            BarSwitch/KeyboardShortcutManager.swift
 
       - name: Build (x86_64)
         run: |
@@ -42,16 +41,19 @@ jobs:
             BarSwitch/BarSwitchApp.swift \
             BarSwitch/MenuBarManager.swift \
             BarSwitch/LaunchAtLoginManager.swift \
-            BarSwitch/KeyboardShortcutManager.swift \
-            BarSwitch/AboutView.swift
+            BarSwitch/KeyboardShortcutManager.swift
 
       - name: Create universal binary
         run: |
           mkdir -p build/BarSwitch.app/Contents/MacOS
           mkdir -p build/BarSwitch.app/Contents/Resources
           lipo -create build-arm64/BarSwitch build-x86/BarSwitch -output build/BarSwitch.app/Contents/MacOS/BarSwitch
+          lipo -info build/BarSwitch.app/Contents/MacOS/BarSwitch
           cp BarSwitch/Info.plist build/BarSwitch.app/Contents/Info.plist
           cp BarSwitch/AppIcon.icns build/BarSwitch.app/Contents/Resources/AppIcon.icns
+
+      - name: Ad-hoc code sign
+        run: codesign -s - build/BarSwitch.app
 
       - name: Create DMG
         run: |
@@ -70,4 +72,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: BarSwitch-*.dmg
+          fail_on_unmatched_files: true
           generate_release_notes: true

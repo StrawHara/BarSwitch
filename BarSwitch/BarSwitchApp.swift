@@ -1,6 +1,8 @@
 import SwiftUI
 import Combine
 
+let githubIssuesURL = URL(string: "https://github.com/StrawHara/BarSwitch/issues")
+
 @MainActor
 final class AppState: ObservableObject {
     let menuBarManager = MenuBarManager()
@@ -10,7 +12,6 @@ final class AppState: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
 
     init() {
-        // Forward objectWillChange from nested managers so SwiftUI refreshes the menu
         menuBarManager.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
         }.store(in: &cancellables)
@@ -27,6 +28,11 @@ final class AppState: ObservableObject {
             self?.menuBarManager.toggleMode()
         }
     }
+
+    func cleanup() {
+        shortcutManager.stop()
+        menuBarManager.cleanup()
+    }
 }
 
 @main
@@ -35,7 +41,6 @@ struct BarSwitchApp: App {
 
     var body: some Scene {
         MenuBarExtra("BarSwitch", systemImage: "menubar.rectangle") {
-            // Mode toggle
             Button {
                 state.menuBarManager.setMode(.always)
             } label: {
@@ -57,7 +62,6 @@ struct BarSwitchApp: App {
 
             Divider()
 
-            // Settings
             Button {
                 state.loginManager.toggle()
             } label: {
@@ -81,20 +85,21 @@ struct BarSwitchApp: App {
 
             Button("About BarSwitch...") {
                 NSApp.activate(ignoringOtherApps: true)
-                NSApp.orderFrontStandardAboutPanel(options: [
+                var options: [NSApplication.AboutPanelOptionKey: Any] = [
                     .applicationName: "BarSwitch",
                     .applicationVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "",
                     .version: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "",
-                    .credits: NSAttributedString(
+                ]
+                if let url = githubIssuesURL {
+                    options[.credits] = NSAttributedString(
                         string: "Report an Issue on GitHub",
-                        attributes: [
-                            .link: URL(string: "https://github.com/StrawHara/BarSwitch/issues")!,
-                            .font: NSFont.systemFont(ofSize: 11)
-                        ]
+                        attributes: [.link: url, .font: NSFont.systemFont(ofSize: 11)]
                     )
-                ])
+                }
+                NSApp.orderFrontStandardAboutPanel(options: options)
             }
             Button("Quit BarSwitch") {
+                state.cleanup()
                 NSApplication.shared.terminate(nil)
             }
             .keyboardShortcut("q")

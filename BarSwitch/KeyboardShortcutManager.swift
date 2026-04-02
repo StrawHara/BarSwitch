@@ -1,5 +1,9 @@
 import Foundation
 import AppKit
+import os
+
+private let logger = Logger(subsystem: "com.barswitch.app", category: "Shortcut")
+private let accessibilitySettingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
 
 @MainActor
 class KeyboardShortcutManager: ObservableObject {
@@ -10,6 +14,7 @@ class KeyboardShortcutManager: ObservableObject {
     private var eventMonitor: Any?
     private var onToggle: (() -> Void)?
     private var accessibilityPollTimer: Timer?
+    private var accessibilityTimeoutTask: DispatchWorkItem?
 
     init() {
         if UserDefaults.standard.object(forKey: "keyboardShortcutEnabled") == nil {
@@ -19,6 +24,7 @@ class KeyboardShortcutManager: ObservableObject {
     }
 
     func start(onToggle: @escaping () -> Void) {
+        guard self.onToggle == nil else { return }
         self.onToggle = onToggle
         if isEnabled && AXIsProcessTrusted() {
             registerMonitor()
@@ -55,12 +61,14 @@ class KeyboardShortcutManager: ObservableObject {
                 }
             }
         }
+        logger.info("Global shortcut ⌘⇧H registered")
     }
 
     private func unregisterMonitor() {
         if let monitor = eventMonitor {
             NSEvent.removeMonitor(monitor)
             eventMonitor = nil
+            logger.info("Global shortcut ⌘⇧H unregistered")
         }
     }
 
@@ -74,12 +82,13 @@ class KeyboardShortcutManager: ObservableObject {
 
         NSApp.activate(ignoringOtherApps: true)
         if alert.runModal() == .alertFirstButtonReturn {
-            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+            if let url = accessibilitySettingsURL {
+                NSWorkspace.shared.open(url)
+            }
             startAccessibilityPolling()
         }
     }
 
-    /// Poll every second to detect when the user grants Accessibility permission
     private func startAccessibilityPolling() {
         stopAccessibilityPolling()
         accessibilityPollTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
@@ -92,14 +101,17 @@ class KeyboardShortcutManager: ObservableObject {
                 }
             }
         }
-        // Stop polling after 60 seconds if user never grants
-        DispatchQueue.main.asyncAfter(deadline: .now() + 60) { [weak self] in
+        let timeout = DispatchWorkItem { [weak self] in
             self?.stopAccessibilityPolling()
         }
+        accessibilityTimeoutTask = timeout
+        DispatchQueue.main.asyncAfter(deadline: .now() + 60, execute: timeout)
     }
 
     private func stopAccessibilityPolling() {
         accessibilityPollTimer?.invalidate()
         accessibilityPollTimer = nil
+        accessibilityTimeoutTask?.cancel()
+        accessibilityTimeoutTask = nil
     }
 }
