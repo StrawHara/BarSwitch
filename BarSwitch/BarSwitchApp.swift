@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 @MainActor
 final class AppState: ObservableObject {
@@ -6,7 +7,22 @@ final class AppState: ObservableObject {
     let loginManager = LaunchAtLoginManager()
     let shortcutManager = KeyboardShortcutManager()
 
+    private var cancellables = Set<AnyCancellable>()
+
     init() {
+        // Forward objectWillChange from nested managers so SwiftUI refreshes the menu
+        menuBarManager.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }.store(in: &cancellables)
+
+        loginManager.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }.store(in: &cancellables)
+
+        shortcutManager.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }.store(in: &cancellables)
+
         shortcutManager.start { [weak self] in
             self?.menuBarManager.toggleMode()
         }
@@ -72,7 +88,7 @@ struct BarSwitchApp: App {
                     .credits: NSAttributedString(
                         string: "Report an Issue on GitHub",
                         attributes: [
-                            .link: URL(string: "https://github.com/strawMusic/BarSwitch/issues")!,
+                            .link: URL(string: "https://github.com/StrawHara/BarSwitch/issues")!,
                             .font: NSFont.systemFont(ofSize: 11)
                         ]
                     )

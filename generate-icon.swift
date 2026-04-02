@@ -8,70 +8,47 @@ func generateIcon(size: Int) -> NSImage {
     let ctx = NSGraphicsContext.current!.cgContext
     let s = CGFloat(size)
 
-    // Background: rounded rectangle with gradient
+    // Background: rounded macOS icon shape, solid dark
     let cornerRadius = s * 0.22
     let rect = CGRect(x: 0, y: 0, width: s, height: s)
     let path = CGPath(roundedRect: rect, cornerWidth: cornerRadius, cornerHeight: cornerRadius, transform: nil)
     ctx.addPath(path)
     ctx.clip()
 
-    // Gradient: dark blue-gray
-    let colors = [
-        CGColor(red: 0.15, green: 0.15, blue: 0.2, alpha: 1.0),
-        CGColor(red: 0.08, green: 0.08, blue: 0.12, alpha: 1.0)
-    ] as CFArray
-    let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0.0, 1.0])!
-    ctx.drawLinearGradient(gradient, start: CGPoint(x: 0, y: s), end: CGPoint(x: 0, y: 0), options: [])
+    // Solid dark background
+    ctx.setFillColor(CGColor(red: 0.12, green: 0.12, blue: 0.14, alpha: 1.0))
+    ctx.fill(rect)
 
-    // Menu bar rectangle at top
-    let barHeight = s * 0.06
-    let barY = s - barHeight - s * 0.18
-    let barRect = CGRect(x: s * 0.12, y: barY, width: s * 0.76, height: barHeight)
-    let barPath = CGPath(roundedRect: barRect, cornerWidth: barHeight * 0.4, cornerHeight: barHeight * 0.4, transform: nil)
-    ctx.setFillColor(CGColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 0.9))
-    ctx.addPath(barPath)
-    ctx.fillPath()
+    // Single white horizontal bar near the top — representing the menu bar
+    let barHeight = s * 0.045
+    let barY = s * 0.72
+    let barX = s * 0.18
+    let barWidth = s * 0.64
+    let barRect = CGRect(x: barX, y: barY, width: barWidth, height: barHeight)
+    ctx.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 0.95))
+    ctx.fill(barRect)
 
-    // Toggle switch visual below the bar
-    let switchWidth = s * 0.24
-    let switchHeight = s * 0.12
-    let switchX = (s - switchWidth) / 2
-    let switchY = barY - switchHeight - s * 0.12
-    let switchRect = CGRect(x: switchX, y: switchY, width: switchWidth, height: switchHeight)
-    let switchPath = CGPath(roundedRect: switchRect, cornerWidth: switchHeight / 2, cornerHeight: switchHeight / 2, transform: nil)
+    // Small up arrow above the bar
+    let arrowSize = s * 0.07
+    let centerX = s / 2
+    let arrowY = barY - s * 0.14
 
-    // Switch background (blue = on)
-    ctx.setFillColor(CGColor(red: 0.2, green: 0.5, blue: 1.0, alpha: 1.0))
-    ctx.addPath(switchPath)
-    ctx.fillPath()
-
-    // Switch knob (right side = on)
-    let knobSize = switchHeight * 0.8
-    let knobX = switchX + switchWidth - knobSize - (switchHeight - knobSize) / 2
-    let knobY = switchY + (switchHeight - knobSize) / 2
-    let knobRect = CGRect(x: knobX, y: knobY, width: knobSize, height: knobSize)
-    ctx.setFillColor(.white)
-    ctx.fillEllipse(in: knobRect)
-
-    // Up/down arrows
-    let arrowSize = s * 0.08
-    let arrowX = (s - arrowSize) / 2
-
-    // Up arrow
-    let upY = switchY + switchHeight + s * 0.06
-    ctx.setStrokeColor(CGColor(red: 1, green: 1, blue: 1, alpha: 0.7))
-    ctx.setLineWidth(s * 0.025)
+    ctx.setStrokeColor(CGColor(red: 1, green: 1, blue: 1, alpha: 0.5))
+    ctx.setLineWidth(s * 0.02)
     ctx.setLineCap(.round)
-    ctx.move(to: CGPoint(x: arrowX, y: upY))
-    ctx.addLine(to: CGPoint(x: arrowX + arrowSize / 2, y: upY + arrowSize * 0.6))
-    ctx.addLine(to: CGPoint(x: arrowX + arrowSize, y: upY))
+    ctx.setLineJoin(.round)
+
+    // Down arrow (hide)
+    ctx.move(to: CGPoint(x: centerX - arrowSize, y: arrowY + arrowSize * 0.6))
+    ctx.addLine(to: CGPoint(x: centerX, y: arrowY))
+    ctx.addLine(to: CGPoint(x: centerX + arrowSize, y: arrowY + arrowSize * 0.6))
     ctx.strokePath()
 
-    // Down arrow
-    let downY = switchY - s * 0.06
-    ctx.move(to: CGPoint(x: arrowX, y: downY))
-    ctx.addLine(to: CGPoint(x: arrowX + arrowSize / 2, y: downY - arrowSize * 0.6))
-    ctx.addLine(to: CGPoint(x: arrowX + arrowSize, y: downY))
+    // Up arrow (show)
+    let arrowY2 = arrowY - s * 0.1
+    ctx.move(to: CGPoint(x: centerX - arrowSize, y: arrowY2))
+    ctx.addLine(to: CGPoint(x: centerX, y: arrowY2 + arrowSize * 0.6))
+    ctx.addLine(to: CGPoint(x: centerX + arrowSize, y: arrowY2))
     ctx.strokePath()
 
     img.unlockFocus()
@@ -101,8 +78,6 @@ for (name, size) in sizes {
         print("Failed to generate \(name)")
         continue
     }
-    let path = "\(iconsetPath)/\(name).png"
-    try! png.write(to: URL(fileURLWithPath: path))
-    print("Generated \(path)")
+    try! png.write(to: URL(fileURLWithPath: "\(iconsetPath)/\(name).png"))
 }
-print("Done. Run: iconutil -c icns \(iconsetPath)")
+print("Done")

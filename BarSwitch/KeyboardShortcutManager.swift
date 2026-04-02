@@ -9,6 +9,7 @@ class KeyboardShortcutManager: ObservableObject {
 
     private var eventMonitor: Any?
     private var onToggle: (() -> Void)?
+    private var accessibilityPollTimer: Timer?
 
     init() {
         if UserDefaults.standard.object(forKey: "keyboardShortcutEnabled") == nil {
@@ -19,7 +20,6 @@ class KeyboardShortcutManager: ObservableObject {
 
     func start(onToggle: @escaping () -> Void) {
         self.onToggle = onToggle
-        // Only register silently if already trusted — no alert during startup
         if isEnabled && AXIsProcessTrusted() {
             registerMonitor()
         }
@@ -27,21 +27,20 @@ class KeyboardShortcutManager: ObservableObject {
 
     func stop() {
         unregisterMonitor()
+        stopAccessibilityPolling()
     }
 
     func toggle() {
         if isEnabled {
-            // Disabling
             isEnabled = false
             unregisterMonitor()
         } else {
-            // Enabling — check accessibility, show alert if needed
-            if !AXIsProcessTrusted() {
+            if AXIsProcessTrusted() {
+                isEnabled = true
+                registerMonitor()
+            } else {
                 promptAccessibility()
-                return
             }
-            isEnabled = true
-            registerMonitor()
         }
     }
 
@@ -68,12 +67,39 @@ class KeyboardShortcutManager: ObservableObject {
     private func promptAccessibility() {
         let alert = NSAlert()
         alert.messageText = "Accessibility Permission Required"
-        alert.informativeText = "BarSwitch needs Accessibility permission to use the global keyboard shortcut (⌘⇧H).\n\nClick \"Open Settings\" to grant access in System Settings > Privacy & Security > Accessibility."
+        alert.informativeText = "BarSwitch needs Accessibility permission for the ⌘⇧H shortcut.\n\nGrant access in System Settings > Privacy & Security > Accessibility, then it will activate automatically."
         alert.addButton(withTitle: "Open Settings")
         alert.addButton(withTitle: "Cancel")
         alert.alertStyle = .informational
+
+        NSApp.activate(ignoringOtherApps: true)
         if alert.runModal() == .alertFirstButtonReturn {
             NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+            startAccessibilityPolling()
         }
+    }
+
+    /// Poll every second to detect when the user grants Accessibility permission
+    private func startAccessibilityPolling() {
+        stopAccessibilityPolling()
+        accessibilityPollTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                if AXIsProcessTrusted() {
+                    self.stopAccessibilityPolling()
+                    self.isEnabled = true
+                    self.registerMonitor()
+                }
+            }
+        }
+        // Stop polling after 60 seconds if user never grants
+        DispatchQueue.main.asyncAfter(deadline: .now() + 60) { [weak self] in
+            self?.stopAccessibilityPolling()
+        }
+    }
+
+    private func stopAccessibilityPolling() {
+        accessibilityPollTimer?.invalidate()
+        accessibilityPollTimer = nil
     }
 }
